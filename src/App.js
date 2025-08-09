@@ -1,22 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, setDoc, getDoc, collection, query, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, onSnapshot, setDoc, collection, query, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 
-// --- Firebase 설정 (환경 변수에서 가져옴) ---
+// --- Firebase 설정 (환경 변수에서 안전하게 가져오기) ---
 const firebaseConfig = {
-  apiKey: "AIzaSyABC1Zjb3YSZQQ4XhVDMfWPDJ_DVrmG590",
-  authDomain: "anti-koala.firebaseapp.com",
-  projectId: "anti-koala",
-  storageBucket: "anti-koala.firebasestorage.app",
-  messagingSenderId: "239731379993",
-  appId: "1:239731379993:web:6276a83da7ea3c1cc5bf88",
-  measurementId: "G-R3HP04H1WM"
+  apiKey: process.env.REACT_APP_apiKey,
+  authDomain: process.env.REACT_APP_authDomain,
+  projectId: process.env.REACT_APP_projectId,
+  storageBucket: process.env.REACT_APP_storageBucket,
+  messagingSenderId: process.env.REACT_APP_messagingSenderId,
+  appId: process.env.REACT_APP_appId
 };
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const appId = firebaseConfig.appId;
 
 // --- 상수 정의 ---
-const DRINKS_INFO = { soju: { name: "소주", volume: 50, abv: 0.169 }, beer: { name: "맥주", volume: 200, abv: 0.05 }, somac: { name: "소맥", volume: 200, abv: 0.09 }, whiskey: { name: "위스키", volume: 30, abv: 0.40 }, wine: { name: "와인", volume: 125, abv: 0.13 }, makgeolli: { name: "막걸리", volume: 150, abv: 0.06 } };
+const DRINKS_INFO = { soju: { name: "소주", volume: 50, abv: 0.169 }, beer: { name: "맥주", volume: 200, abv: 0.05 }, somac: { name: "소맥", volume: 200, abv: 0.09 }, whiskey: { name: "위스키", volume: 30, abv: 0.42 }, wine: { name: "와인", volume: 100, abv: 0.13 }, makgeolli: { name: "막걸리", volume: 150, abv: 0.06 }, highball: { name: "하이볼", volume: 300, abv: 0.08} };
 const ALCOHOL_DENSITY = 0.789;
 const BAC_ELIMINATION_RATE = 0.015;
 const SOJU_BOTTLE_ALCOHOL_GRAMS = 360 * 0.169 * ALCOHOL_DENSITY;
@@ -438,9 +437,8 @@ export default function App() {
                 setUserId(user.uid);
             } else {
                 try {
-                    const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                    if (token) await signInWithCustomToken(auth, token); else await signInAnonymously(auth);
-                } catch (error) { console.error("Authentication error", error); }
+                    await signInAnonymously(auth);
+                } catch (error) { console.error("Anonymous sign-in error", error); }
             }
         });
         return () => unsubscribe();
