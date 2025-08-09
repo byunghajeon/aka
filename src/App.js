@@ -3,14 +3,15 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, setDoc, collection, query, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 
+
 // --- Firebase 설정 (환경 변수에서 안전하게 가져오기) ---
 const firebaseConfig = {
-  apiKey: process.env.REACT_APP_apiKey,
-  authDomain: process.env.REACT_APP_authDomain,
-  projectId: process.env.REACT_APP_projectId,
-  storageBucket: process.env.REACT_APP_storageBucket,
-  messagingSenderId: process.env.REACT_APP_messagingSenderId,
-  appId: process.env.REACT_APP_appId
+  apiKey: process.env.REACT_APP_API_KEY,
+  authDomain: process.env.REACT_APP_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_APP_ID
 };
 const appId = firebaseConfig.appId;
 
@@ -311,6 +312,7 @@ const SessionListItem = ({ session, userProfile, onSelectSession, onDeleteClick 
     const [remainingDetoxTime, setRemainingDetoxTime] = useState('');
 
     useEffect(() => {
+        // userProfile이 아직 로드되지 않았으면, 계산을 시도하지 않고 바로 종료!
         if (!session.endTime || !session.startTime || !userProfile) {
             setRemainingDetoxTime('');
             return;
