@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import Calendar from 'react-calendar';
 import { initializeApp } from 'firebase/app';
-// *** 변경점: 이메일/비밀번호 회원가입, 로그인, 로그아웃 기능을 추가로 import 합니다. ***
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, setDoc, collection, query, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 
@@ -15,9 +15,6 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_APP_ID
 };
 const appId = firebaseConfig.appId;
-
-// 아래 한 줄을 추가하세요!
-console.log("Firebase Config:", firebaseConfig); 
 
 // --- 상수 정의 ---
 const DRINKS_INFO = { 
@@ -38,7 +35,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- 헬퍼 함수 (이전과 동일) ---
+// --- 헬퍼 함수 ---
 const formatEventDate = (date) => {
     if (!date) return '-';
     const d = date instanceof Date ? date : date.toDate();
@@ -71,155 +68,202 @@ const getPercentageColor = (percentage) => {
     if (percentage > 20) return 'bg-green-500';
     return 'bg-blue-500';
 };
+const getBACStatus = (bac) => {
+    if (bac >= 0.2) { return { color: 'bg-red-600', message: '면허 취소: 2~5년 징역 또는 1~2천만원 벌금' }; } 
+    else if (bac >= 0.08) { return { color: 'bg-red-600', message: '면허 취소: 1~2년 징역 또는 500~1천만원 벌금' }; } 
+    else if (bac >= 0.03) { return { color: 'bg-yellow-500', message: '면허 정지: 1년 이하 징역 또는 500만원 이하 벌금' }; } 
+    else if (bac > 0) { return { color: 'bg-blue-600', message: '알코올이 검출되었습니다. 숙취 운전도 음주운전입니다.' }; }
+    return { color: 'bg-gray-800', message: '' };
+};
 
 
-// --- 컴포넌트 (이전과 동일) ---
+// --- 컴포넌트 ---
 const Loader = () => ( <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-emerald-500"></div></div>);
 const ConfirmationModal = ({ title, message, onConfirm, onCancel }) => ( <div className="modal is-open fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"><div className="bg-gray-800 rounded-lg p-6 w-full max-w-sm"><h2 className="text-2xl font-bold text-center mb-2">{title}</h2><p className="text-center text-gray-300 mb-6">{message}</p><div className="flex space-x-2 mt-6"><button onClick={onCancel} className="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded-lg transition">취소</button><button onClick={onConfirm} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-lg transition">삭제</button></div></div></div>);
 const EditSessionNameModal = ({ currentName, onSave, onClose }) => { const [eventName, setEventName] = useState(currentName); const handleSave = () => { if (!eventName.trim()) { console.error("이벤트 이름을 입력해주세요."); return; } onSave(eventName.trim()); }; return ( <div className="modal is-open fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"><div className="bg-gray-800 rounded-lg p-6 w-full max-w-sm"><h2 className="text-2xl font-bold text-center mb-4">이벤트 이름 수정</h2><input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="이벤트 이름" className="w-full mt-2 bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" /><div className="flex space-x-2 mt-6"><button onClick={onClose} className="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded-lg transition">취소</button><button onClick={handleSave} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition">저장</button></div></div></div> );};
 const ProfileModal = ({ userProfile, onSave, onClose }) => { const [name, setName] = useState(userProfile?.name || ''); const [gender, setGender] = useState(userProfile?.gender || 'male'); const [weight, setWeight] = useState(userProfile?.weight || ''); const [capacity, setCapacity] = useState(userProfile?.capacity || ''); const handleSave = () => { if (!name.trim() || !gender || !weight || weight <= 0 || !capacity || capacity <= 0) { console.error("모든 정보를 올바르게 입력해주세요."); return; } onSave({ name: name.trim(), gender, weight: parseFloat(weight), capacity: parseFloat(capacity) }); }; return ( <div className="modal is-open fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"><div className="bg-gray-800 rounded-lg p-6 w-full max-w-sm"><h2 className="text-2xl font-bold text-center mb-4">사용자 정보</h2><div className="space-y-4"><div><label htmlFor="name-input" className="font-bold">이름</label><input type="text" id="name-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="이름을 입력하세요" className="w-full mt-2 bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" /></div><div><label className="font-bold">성별</label><div className="flex justify-around mt-2"><label className="flex items-center space-x-2 p-2 rounded-lg bg-gray-700"><input type="radio" name="gender" value="male" checked={gender === 'male'} onChange={(e) => setGender(e.target.value)} className="form-radio text-emerald-500" /><span>남성</span></label><label className="flex items-center space-x-2 p-2 rounded-lg bg-gray-700"><input type="radio" name="gender" value="female" checked={gender === 'female'} onChange={(e) => setGender(e.target.value)} className="form-radio text-emerald-500" /><span>여성</span></label></div></div><div><label htmlFor="weight-input" className="font-bold">체중 (kg)</label><input type="number" id="weight-input" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="예: 70" className="w-full mt-2 bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" /></div><div><label htmlFor="capacity-input" className="font-bold">주량 (소주 병 기준)</label><input type="number" id="capacity-input" value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="예: 2" className="w-full mt-2 bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" /></div></div><div className="flex space-x-2 mt-6"><button onClick={onClose} className="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded-lg transition">닫기</button><button onClick={handleSave} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition">저장하기</button></div></div></div> );};
-const NewSessionModal = ({ onSave, onClose }) => { const [eventName, setEventName] = useState(''); const handleSave = () => { if (!eventName.trim()) { console.error("이벤트 이름을 입력해주세요."); return; } onSave(eventName.trim()); }; return ( <div className="modal is-open fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"><div className="bg-gray-800 rounded-lg p-6 w-full max-w-sm"><h2 className="text-2xl font-bold text-center mb-4">새로운 술자리</h2><input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="이벤트 이름 (예: 팀 회식)" className="w-full mt-2 bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" /><div className="flex space-x-2 mt-6"><button onClick={onClose} className="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded-lg transition">취소</button><button onClick={handleSave} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition">생성하기</button></div></div></div> );};
-const SessionDetail = ({ userId, userProfile, sessionId, goBack, onEditClick }) => { const [session, setSession] = useState(null); const [calculation, setCalculation] = useState({ currentGrams: 0, currentBAC: 0, soberTime: null, percentage: 0 }); useEffect(() => { if (!userId || !sessionId) return; const sessionRef = doc(db, `artifacts/${appId}/users/${userId}/drinking_sessions/${sessionId}`); const unsubscribe = onSnapshot(sessionRef, (docSnap) => { if (docSnap.exists()) { setSession({ id: docSnap.id, ...docSnap.data() }); } else { goBack(); } }); return () => unsubscribe(); }, [userId, sessionId, goBack]); useEffect(() => { if (!session || !userProfile) return; const interval = setInterval(() => { const totalConsumedGrams = Object.keys(session.counts).reduce((acc, key) => (acc + (session.counts[key] * DRINKS_INFO[key].volume * DRINKS_INFO[key].abv * ALCOHOL_DENSITY)), 0); const capacityInGrams = userProfile.capacity * SOJU_BOTTLE_ALCOHOL_GRAMS; const percentage = capacityInGrams > 0 ? (totalConsumedGrams / capacityInGrams) * 100 : 0; let currentGrams = totalConsumedGrams, currentBAC = 0, soberTime = null; if (session.startTime) { const startTime = session.startTime.toDate(); const genderConstant = userProfile.gender === 'male' ? 0.68 : 0.55; const bodyWeightGrams = userProfile.weight * 1000; const peakBAC = (totalConsumedGrams / (bodyWeightGrams * genderConstant)) * 100; const elapsedHours = (new Date() - startTime) / 3600000; const eliminatedBAC = BAC_ELIMINATION_RATE * elapsedHours; currentBAC = Math.max(0, peakBAC - eliminatedBAC); currentGrams = currentBAC > 0 ? (currentBAC / 100) * (bodyWeightGrams * genderConstant) : 0; if (currentBAC > 0) { const totalHoursToSober = peakBAC / BAC_ELIMINATION_RATE; soberTime = new Date(startTime.getTime() + totalHoursToSober * 3600000); } } setCalculation({ currentGrams, currentBAC, soberTime, percentage }); }, 1000); return () => clearInterval(interval); }, [session, userProfile]); const updateSession = async (data) => { const sessionRef = doc(db, `artifacts/${appId}/users/${userId}/drinking_sessions/${sessionId}`); await setDoc(sessionRef, data, { merge: true }); }; const handleCountChange = (drinkKey, change) => { const newCounts = { ...session.counts }; newCounts[drinkKey] = Math.max(0, (newCounts[drinkKey] || 0) + change); updateSession({ counts: newCounts }); }; const handleStart = () => updateSession({ startTime: new Date() }); const handleEnd = () => updateSession({ endTime: new Date(), peakPercentage: calculation.percentage }); const handleReopen = () => updateSession({ endTime: null, peakPercentage: null }); if (!session) return <Loader />; const { percentage } = calculation; let colorClass = getPercentageColor(percentage); let message; if (percentage > 100) { message = "제발 집에 가자"; } else if (percentage > 80) { message = "꼭 택시 불러서 집에 가, 집에 간다고 연락하고"; } else if (percentage > 60) { message = "많이 취했어 이제 가야돼"; } else if (percentage > 40) { message = "기분좋게 취했어, 집에 갈 준비 하자"; } else if (percentage > 20) { message = "아직은 괜찮아"; } else if (percentage > 0) { message = "오랜만에 반갑습니다"; } else { message = ''; } return ( <div className="w-full max-w-md mx-auto pt-2 pb-32 px-2 sm:px-4 min-h-screen"><header className="text-center py-3"><div className="flex justify-between items-center"><button onClick={goBack} className="p-2 rounded-full hover:bg-gray-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button><h1 className="text-2xl font-bold text-emerald-400 truncate flex-1 text-center">{session.eventName}</h1><button onClick={() => onEditClick(sessionId, session.eventName)} className="p-2 rounded-full hover:bg-gray-800"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button></div></header><div className="p-3 space-y-2"><div className="grid grid-cols-2 gap-2 text-center"><button onClick={handleStart} disabled={!!session.startTime} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg transition disabled:bg-gray-600 disabled:cursor-not-allowed">시작: {session.startTime ? formatTime(session.startTime) : ''}</button>{session.endTime ? ( <button onClick={handleReopen} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-lg transition">다시 시작</button> ) : ( <button onClick={handleEnd} disabled={!session.startTime} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition disabled:bg-gray-500 disabled:cursor-not-allowed">종료</button> )}</div></div><main className="p-3 space-y-3">{Object.entries(DRINKS_INFO).map(([key, info]) => ( <div key={key} className="drink-item flex items-center justify-between bg-gray-800 p-4 rounded-lg"><span className="text-lg font-medium">{info.name}</span><div className="flex items-center space-x-3"><button onClick={() => handleCountChange(key, -1)} className="bg-gray-700 rounded-full w-10 h-10 text-2xl font-bold flex items-center justify-center transition-transform active:scale-90">-</button><span className="count-display text-xl font-bold text-center">{session.counts[key] || 0}잔</span><button onClick={() => handleCountChange(key, 1)} className="bg-emerald-500 rounded-full w-10 h-10 text-2xl font-bold flex items-center justify-center transition-transform active:scale-90">+</button></div></div> ))}</main><footer className="p-4 border-t-2 border-gray-800 mt-4"><div className="grid grid-cols-2 gap-4 text-center"><div className="bg-gray-800 p-3 rounded-lg"><h2 className="text-sm font-bold text-gray-400">현재 체내 알코올</h2><p className="text-2xl font-bold text-emerald-400 mt-1">{calculation.currentGrams.toFixed(1)} g</p></div><div className="bg-gray-800 p-3 rounded-lg"><h2 className="text-sm font-bold text-gray-400">혈중알코올농도</h2><p className="text-2xl font-bold text-emerald-400 mt-1">{calculation.currentBAC.toFixed(3)} %</p></div></div><div className="mt-4"><h2 className="text-sm font-bold text-gray-400 text-center mb-2">주량 대비</h2><div className="w-full bg-gray-700 rounded-full h-5"><div className={`h-5 rounded-full text-center text-white text-xs font-bold flex items-center justify-center transition-all duration-300 ease-in-out ${colorClass}`} style={{ width: `${Math.min(100, percentage)}%` }}><span>{Math.round(percentage)}%</span></div></div><p className="text-center text-sm text-gray-300 mt-2 h-4">{message}</p></div><div className="bg-gray-800 p-3 rounded-lg text-center mt-4"><h2 className="text-sm font-bold text-gray-400">분해 완료 예상</h2><p className="text-xl font-bold text-white mt-1">{calculation.soberTime ? `${formatTime(calculation.soberTime)} (${formatEventDate(calculation.soberTime)})` : (session.startTime ? '분해 완료!' : '-')}</p></div></footer></div> );};
-const SessionListItem = ({ session, userProfile, onSelectSession, onDeleteClick }) => { const [remainingDetoxTime, setRemainingDetoxTime] = useState(''); useEffect(() => { if (!session.endTime || !session.startTime || !userProfile) { setRemainingDetoxTime(''); return; } const calculate = () => { const totalConsumedGrams = Object.keys(session.counts).reduce((acc, key) => (acc + (session.counts[key] * DRINKS_INFO[key].volume * DRINKS_INFO[key].abv * ALCOHOL_DENSITY)), 0); const genderConstant = userProfile.gender === 'male' ? 0.68 : 0.55; const bodyWeightGrams = userProfile.weight * 1000; const peakBAC = (totalConsumedGrams / (bodyWeightGrams * genderConstant)) * 100; const totalHoursToSober = peakBAC / BAC_ELIMINATION_RATE; const soberUpDate = new Date(session.startTime.toDate().getTime() + totalHoursToSober * 3600000); const remainingMillis = soberUpDate.getTime() - new Date().getTime(); if (remainingMillis > 0) { const hours = Math.floor(remainingMillis / 3600000); const minutes = Math.round((remainingMillis % 3600000) / 60000); setRemainingDetoxTime(`해독까지 ${hours}시간 ${minutes}분 남음`); } else { setRemainingDetoxTime(''); } }; calculate(); const interval = setInterval(calculate, 60000); return () => clearInterval(interval); }, [session, userProfile]); const duration = calculateDuration(session.startTime, session.endTime); const colorClass = getPercentageColor(session.peakPercentage); const handleDelete = (e) => { e.stopPropagation(); onDeleteClick(session.id); }; return ( <div onClick={() => onSelectSession(session.id)} className="bg-gray-800 p-4 rounded-lg flex items-center cursor-pointer hover:bg-gray-700 transition-colors group"><div className="flex-grow"><p className="font-bold text-lg">{session.eventName}</p><p className="text-sm text-gray-400">{formatEventDate(session.createdAt)}{duration && <span className="ml-2 text-yellow-400">{`(${duration})`}</span>}</p>{remainingDetoxTime && <p className="text-xs text-cyan-400 mt-1">{remainingDetoxTime}</p>}</div>{session.peakPercentage != null && ( <div className="text-right flex flex-col items-end mr-4"><span className={`px-3 py-1 text-sm font-bold rounded-full text-white ${colorClass}`}>{Math.round(session.peakPercentage)}%</span><p className="text-xs text-gray-400 mt-1">주량 대비</p></div> )}<button onClick={handleDelete} className="p-2 rounded-full text-gray-500 hover:bg-red-900 hover:text-white transition-all opacity-0 group-hover:opacity-100"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button></div> );};
 
-// *** 새로운 컴포넌트: 로그인/회원가입 화면 ***
-const AuthScreen = ({ onAuthSuccess }) => {
-    const [isLogin, setIsLogin] = useState(true);
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
+// *** 변경점: NewSessionModal에서 시간 입력 제거, 날짜만 선택 ***
+const NewSessionModal = ({ onSave, onClose }) => {
+    const [eventName, setEventName] = useState('');
+    const [eventDate, setEventDate] = useState(new Date().toISOString().split('T')[0]);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-        try {
-            if (isLogin) {
-                await signInWithEmailAndPassword(auth, email, password);
-            } else {
-                await createUserWithEmailAndPassword(auth, email, password);
-            }
-            // 성공 시 App 컴포넌트에서 onAuthStateChanged가 감지하므로 별도 처리는 불필요
-        } catch (err) {
-            setError(err.message);
+    const handleSave = () => {
+        if (!eventName.trim()) {
+            console.error("이벤트 이름을 입력해주세요.");
+            return;
         }
+        onSave(eventName.trim(), new Date(eventDate));
     };
 
     return (
-        <div className="w-full max-w-md mx-auto pt-10 px-4">
-            <header className="text-center mb-8">
-                <h1 className="text-4xl font-bold text-emerald-400">안티코알라 🐨</h1>
-                <p className="text-gray-400 mt-2">당신의 건강한 음주 생활을 위해</p>
-            </header>
-            <div className="bg-gray-800 p-6 rounded-lg">
-                <div className="flex border-b border-gray-700 mb-4">
-                    <button onClick={() => setIsLogin(true)} className={`w-1/2 py-2 font-bold ${isLogin ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-gray-400'}`}>로그인</button>
-                    <button onClick={() => setIsLogin(false)} className={`w-1/2 py-2 font-bold ${!isLogin ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-gray-400'}`}>회원가입</button>
+        <div className="modal is-open fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-800 rounded-lg p-6 w-full max-w-sm">
+                <h2 className="text-2xl font-bold text-center mb-4">새로운 술자리</h2>
+                <div className="space-y-4">
+                    <div>
+                        <label htmlFor="event-name-input" className="text-sm font-bold text-gray-400">이벤트 이름</label>
+                        <input type="text" id="event-name-input" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="예: 팀 회식" className="w-full mt-1 bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" />
+                    </div>
+                    <div>
+                        <label htmlFor="event-date-input" className="text-sm font-bold text-gray-400">날짜</label>
+                        <input type="date" id="event-date-input" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className="w-full mt-1 bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" />
+                    </div>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* 이메일 input에 autocomplete="email" 추가 */}
-                    <input 
-                        type="email" 
-                        value={email} 
-                        onChange={e => setEmail(e.target.value)} 
-                        placeholder="이메일" 
-                        required 
-                        className="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" 
-                        autoComplete="email" 
-                    />
-                    {/* 비밀번호 input에 autocomplete="current-password" 추가 */}
-                    <input 
-                        type="password" 
-                        value={password} 
-                        onChange={e => setPassword(e.target.value)} 
-                        placeholder="비밀번호 (6자 이상)" 
-                        required 
-                        className="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" 
-                        autoComplete="current-password"
-                    />
-                    <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg transition">{isLogin ? '로그인' : '회원가입'}</button>
-                    {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                </form>
+                <div className="flex space-x-2 mt-6">
+                    <button onClick={onClose} className="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded-lg transition">취소</button>
+                    <button onClick={handleSave} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition">생성하기</button>
+                </div>
             </div>
         </div>
     );
 };
 
-
-const SessionList = ({ sessions, userProfile, onSelectSession, onCreateSession, onProfileClick, onDeleteClick, onLogout }) => {
-    return (
-        <div className="w-full max-w-md mx-auto pt-2 px-2 sm:px-4">
-             <header className="text-center py-3">
-                 <div className="flex justify-between items-center px-2">
-                     <div className="flex items-center">
-                         <h1 className="text-3xl sm:text-4xl font-bold text-emerald-400">안티코알라</h1>
-                         <span className="text-3xl ml-2">🐨</span>
-                     </div>
-                     <div className="flex items-center space-x-2">
-                        <button onClick={onProfileClick} className="p-2 rounded-full hover:bg-gray-800">
-                            <div className="flex items-center space-x-2">
-                                <span className="text-white font-semibold">{userProfile?.name}</span>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                            </div>
-                        </button>
-                        {/* *** 변경점: 로그아웃 버튼 추가 *** */}
-                        <button onClick={onLogout} title="로그아웃" className="p-2 rounded-full text-gray-400 hover:bg-gray-800 hover:text-white">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                        </button>
-                    </div>
-                 </div>
-             </header>
-            
-             <div className="px-2 my-4">
-                 <button onClick={onCreateSession} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg shadow-lg text-lg transition-transform active:scale-95">+ 새로운 술자리</button>
-             </div>
-
-             <main className="space-y-3 pb-20">
-                 {sessions.length === 0 ? (
-                     <div className="text-center text-gray-500 mt-16">
-                         <p className="text-lg">아직 기록이 없네요.</p>
-                         <p>상단의 버튼을 눌러 첫 술자리를 기록해보세요!</p>
-                     </div>
-                 ) : (
-                     sessions.map(session => (
-                        <SessionListItem 
-                           key={session.id} 
-                           session={session} 
-                           userProfile={userProfile} 
-                           onSelectSession={onSelectSession}
-                           onDeleteClick={onDeleteClick}
-                        />
-                     ))
-                 )}
-             </main>
-         </div>
-    );
+const TimeEditModal = ({ onSave, onClose, initialTime, title }) => {
+    const [time, setTime] = useState(initialTime);
+    const handleSave = () => { onSave(time); onClose(); };
+    return ( <div className="modal is-open fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"><div className="bg-gray-800 rounded-lg p-6 w-full max-w-sm"><h2 className="text-2xl font-bold text-center mb-4">{title}</h2><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full mt-1 bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" /><div className="flex space-x-2 mt-6"><button onClick={onClose} className="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 rounded-lg transition">취소</button><button onClick={handleSave} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition">저장</button></div></div></div> );
 };
 
+// *** 변경점: SessionDetail 로직 대규모 수정 ***
+const SessionDetail = ({ userId, userProfile, sessionId, goBack, onEditClick }) => {
+    const [session, setSession] = useState(null);
+    const [calculation, setCalculation] = useState({ peakGrams: 0, peakBAC: 0, soberTime: null, percentage: 0 });
+    const [timeEditModal, setTimeEditModal] = useState({ isOpen: false, type: null });
+
+    useEffect(() => {
+        if (!userId || !sessionId) return;
+        const sessionRef = doc(db, `artifacts/${appId}/users/${userId}/drinking_sessions/${sessionId}`);
+        const unsubscribe = onSnapshot(sessionRef, (docSnap) => {
+            if (docSnap.exists()) { setSession({ id: docSnap.id, ...docSnap.data() }); } else { goBack(); }
+        });
+        return () => unsubscribe();
+    }, [userId, sessionId, goBack]);
+
+    useEffect(() => {
+        if (!session || !userProfile) return;
+        const totalConsumedGrams = Object.keys(session.counts).reduce((acc, key) => (acc + (session.counts[key] * DRINKS_INFO[key].volume * DRINKS_INFO[key].abv * ALCOHOL_DENSITY)), 0);
+        const capacityInGrams = userProfile.capacity * SOJU_BOTTLE_ALCOHOL_GRAMS;
+        const percentage = capacityInGrams > 0 ? (totalConsumedGrams / capacityInGrams) * 100 : 0;
+        let peakBAC = 0, soberTime = null;
+        if (session.startTime && totalConsumedGrams > 0) {
+            const genderConstant = userProfile.gender === 'male' ? 0.68 : 0.55;
+            const bodyWeightGrams = userProfile.weight * 1000;
+            peakBAC = (totalConsumedGrams / (bodyWeightGrams * genderConstant)) * 100;
+            const totalHoursToSober = peakBAC / BAC_ELIMINATION_RATE;
+            soberTime = new Date(session.startTime.toDate().getTime() + totalHoursToSober * 3600000);
+        }
+        setCalculation({ peakGrams: totalConsumedGrams, peakBAC, soberTime, percentage });
+    }, [session, userProfile]);
+
+    const updateSession = async (data) => {
+        const sessionRef = doc(db, `artifacts/${appId}/users/${userId}/drinking_sessions/${sessionId}`);
+        await setDoc(sessionRef, data, { merge: true });
+    };
+
+    const handleCountChange = (drinkKey, change) => {
+        const newCounts = { ...session.counts };
+        newCounts[drinkKey] = Math.max(0, (newCounts[drinkKey] || 0) + change);
+        updateSession({ counts: newCounts });
+    };
+
+    const handleSaveTime = (newTime) => {
+        const sessionDate = session.createdAt.toDate();
+        const [hours, minutes] = newTime.split(':');
+        const newDateTime = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate(), hours, minutes);
+        if (timeEditModal.type === 'start') {
+            updateSession({ startTime: newDateTime });
+        } else {
+            const startTime = session.startTime.toDate();
+            if (newDateTime < startTime) { newDateTime.setDate(newDateTime.getDate() + 1); }
+            updateSession({ endTime: newDateTime });
+        }
+    };
+
+    // *** 새로운 함수: 시작/종료 버튼 클릭 처리 ***
+    const handleTimeButtonClick = (type) => {
+        const timeExists = type === 'start' ? session.startTime : session.endTime;
+        if (timeExists) {
+            // 시간이 이미 있으면 수정 모달 열기
+            setTimeEditModal({ isOpen: true, type: type });
+        } else {
+            // 시간이 없으면 현재 시간으로 기록
+            const now = new Date();
+            if (type === 'start') {
+                updateSession({ startTime: now });
+            } else if (session.startTime) { // 시작 시간이 있어야 종료 시간 기록 가능
+                updateSession({ endTime: now });
+            }
+        }
+    };
+
+    if (!session) return <Loader />;
+
+    const { percentage, peakBAC, peakGrams, soberTime } = calculation;
+    const colorClass = getPercentageColor(percentage);
+    const bacStatus = getBACStatus(peakBAC);
+    const duration = calculateDuration(session.startTime, session.endTime);
+
+    return (
+        <div className="w-full max-w-md mx-auto pt-2 pb-32 px-2 sm:px-4 min-h-screen">
+            {timeEditModal.isOpen && (
+                <TimeEditModal
+                    title={timeEditModal.type === 'start' ? '시작 시간 수정' : '종료 시간 수정'}
+                    initialTime={ (timeEditModal.type === 'start' ? session.startTime?.toDate() : session.endTime?.toDate())?.toTimeString().substring(0,5) || '19:00' }
+                    onSave={handleSaveTime}
+                    onClose={() => setTimeEditModal({ isOpen: false, type: null })}
+                />
+            )}
+            <header className="text-center py-3"><div className="flex justify-between items-center"><button onClick={goBack} className="p-2 rounded-full hover:bg-gray-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button><h1 className="text-2xl font-bold text-emerald-400 truncate flex-1 text-center">{session.eventName}</h1><button onClick={() => onEditClick(sessionId, session.eventName)} className="p-2 rounded-full hover:bg-gray-800"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button></div></header>
+            
+            <div className="p-3 text-center text-gray-400">
+                <p>{formatEventDate(session.createdAt)}</p>
+                {/* *** 변경점: 시작/종료 버튼 로직 수정 *** */}
+                <div className="grid grid-cols-2 gap-2 text-center mt-2">
+                    <button onClick={() => handleTimeButtonClick('start')} className="bg-blue-600 hover:bg-blue-500 text-white py-2 px-4 rounded-lg transition">
+                        {session.startTime ? formatTime(session.startTime) : '시작'}
+                    </button>
+                    <button onClick={() => handleTimeButtonClick('end')} disabled={!session.startTime} className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded-lg transition disabled:bg-gray-500 disabled:cursor-not-allowed">
+                        {session.endTime ? formatTime(session.endTime) : '종료'}
+                    </button>
+                </div>
+                {duration && <p className="mt-2 text-sm">({duration})</p>}
+            </div>
+
+            <main className="p-3 space-y-3">{Object.entries(DRINKS_INFO).map(([key, info]) => ( <div key={key} className="drink-item flex items-center justify-between bg-gray-800 p-4 rounded-lg"><span className="text-lg font-medium">{info.name}</span><div className="flex items-center space-x-3"><button onClick={() => handleCountChange(key, -1)} className="bg-gray-700 rounded-full w-10 h-10 text-2xl font-bold flex items-center justify-center transition-transform active:scale-90">-</button><span className="count-display text-xl font-bold text-center">{session.counts[key] || 0}잔</span><button onClick={() => handleCountChange(key, 1)} className="bg-emerald-500 rounded-full w-10 h-10 text-2xl font-bold flex items-center justify-center transition-transform active:scale-90">+</button></div></div> ))}</main>
+            <footer className="p-4 border-t-2 border-gray-800 mt-4"><div className="grid grid-cols-2 gap-4 text-center"><div className="bg-gray-800 p-3 rounded-lg"><h2 className="text-sm font-bold text-gray-400">총 섭취 알코올</h2><p className="text-2xl font-bold text-emerald-400 mt-1">{peakGrams.toFixed(1)} g</p></div><div className={`p-3 rounded-lg transition-colors duration-500 ${bacStatus.color}`}><h2 className="text-sm font-bold text-gray-200">최고 혈중알코올농도</h2><p className="text-2xl font-bold text-white mt-1">{peakBAC.toFixed(3)} %</p></div></div><p className="text-center text-sm text-yellow-400 mt-3 h-4">{bacStatus.message}</p><div className="mt-4"><h2 className="text-sm font-bold text-gray-400 text-center mb-2">주량 대비</h2><div className="w-full bg-gray-700 rounded-full h-5"><div className={`h-5 rounded-full text-center text-white text-xs font-bold flex items-center justify-center transition-all duration-300 ease-in-out ${colorClass}`} style={{ width: `${Math.min(100, percentage)}%` }}><span>{Math.round(percentage)}%</span></div></div></div><div className="bg-gray-800 p-3 rounded-lg text-center mt-4"><h2 className="text-sm font-bold text-gray-400">분해 완료 예상</h2><p className="text-xl font-bold text-white mt-1">{soberTime ? `${formatTime(soberTime)} (${formatEventDate(soberTime)})` : '-'}</p></div></footer>
+        </div>
+    );
+};
+const SessionListItem = ({ session, userProfile, onSelectSession, onDeleteClick }) => { const [remainingDetoxTime, setRemainingDetoxTime] = useState(''); useEffect(() => { if (!session.endTime || !session.startTime || !userProfile) { setRemainingDetoxTime(''); return; } const calculate = () => { const totalConsumedGrams = Object.keys(session.counts).reduce((acc, key) => (acc + (session.counts[key] * DRINKS_INFO[key].volume * DRINKS_INFO[key].abv * ALCOHOL_DENSITY)), 0); const genderConstant = userProfile.gender === 'male' ? 0.68 : 0.55; const bodyWeightGrams = userProfile.weight * 1000; const peakBAC = (totalConsumedGrams / (bodyWeightGrams * genderConstant)) * 100; const totalHoursToSober = peakBAC / BAC_ELIMINATION_RATE; const soberUpDate = new Date(session.startTime.toDate().getTime() + totalHoursToSober * 3600000); const remainingMillis = soberUpDate.getTime() - new Date().getTime(); if (remainingMillis > 0) { const hours = Math.floor(remainingMillis / 3600000); const minutes = Math.round((remainingMillis % 3600000) / 60000); setRemainingDetoxTime(`해독까지 ${hours}시간 ${minutes}분 남음`); } else { setRemainingDetoxTime(''); } }; calculate(); const interval = setInterval(calculate, 60000); return () => clearInterval(interval); }, [session, userProfile]); const duration = calculateDuration(session.startTime, session.endTime); const colorClass = getPercentageColor(session.peakPercentage); const handleDelete = (e) => { e.stopPropagation(); onDeleteClick(session.id); }; return ( <div onClick={() => onSelectSession(session.id)} className="bg-gray-800 p-4 rounded-lg flex items-center cursor-pointer hover:bg-gray-700 transition-colors group"><div className="flex-grow"><p className="font-bold text-lg">{session.eventName}</p><p className="text-sm text-gray-400">{formatEventDate(session.createdAt)}{duration && <span className="ml-2 text-yellow-400">{`(${duration})`}</span>}</p>{remainingDetoxTime && <p className="text-xs text-cyan-400 mt-1">{remainingDetoxTime}</p>}</div>{session.peakPercentage != null && ( <div className="text-right flex flex-col items-end mr-4"><span className={`px-3 py-1 text-sm font-bold rounded-full text-white ${colorClass}`}>{Math.round(session.peakPercentage)}%</span><p className="text-xs text-gray-400 mt-1">주량 대비</p></div> )}<button onClick={handleDelete} className="p-2 rounded-full text-gray-500 hover:bg-red-900 hover:text-white transition-all opacity-0 group-hover:opacity-100"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button></div> );};
+const AuthScreen = ({ onAuthSuccess }) => { const [isLogin, setIsLogin] = useState(true); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const handleSubmit = async (e) => { e.preventDefault(); setError(''); try { if (isLogin) { await signInWithEmailAndPassword(auth, email, password); } else { await createUserWithEmailAndPassword(auth, email, password); } } catch (err) { setError(err.message); } }; return ( <div className="w-full max-w-md mx-auto pt-10 px-4"><header className="text-center mb-8"><h1 className="text-4xl font-bold text-emerald-400">안티코알라 🐨</h1><p className="text-gray-400 mt-2">당신의 건강한 음주 생활을 위해</p></header><div className="bg-gray-800 p-6 rounded-lg"><div className="flex border-b border-gray-700 mb-4"><button onClick={() => setIsLogin(true)} className={`w-1/2 py-2 font-bold ${isLogin ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-gray-400'}`}>로그인</button><button onClick={() => setIsLogin(false)} className={`w-1/2 py-2 font-bold ${!isLogin ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-gray-400'}`}>회원가입</button></div><form onSubmit={handleSubmit} className="space-y-4"><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="이메일" required className="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" autoComplete="email" /><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="비밀번호 (6자 이상)" required className="w-full bg-gray-700 p-3 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-500" autoComplete="current-password"/><button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg transition">{isLogin ? '로그인' : '회원가입'}</button>{error && <p className="text-red-500 text-sm text-center">{error}</p>}</form></div></div> );};
+const SessionList = ({ sessions, userProfile, onSelectSession, onCreateSession, onProfileClick, onDeleteClick, onLogout }) => { return ( <div className="w-full max-w-md mx-auto pt-2 px-2 sm:px-4 pb-20"> <header className="text-center py-3"> <div className="flex justify-between items-center px-2"> <div className="flex items-center"> <h1 className="text-3xl sm:text-4xl font-bold text-emerald-400">안티코알라</h1> <span className="text-3xl ml-2">🐨</span> </div> <div className="flex items-center space-x-2"> <button onClick={onProfileClick} className="p-2 rounded-full hover:bg-gray-800"> <div className="flex items-center space-x-2"> <span className="text-white font-semibold">{userProfile?.name}</span> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> </div> </button> <button onClick={onLogout} title="로그아웃" className="p-2 rounded-full text-gray-400 hover:bg-gray-800 hover:text-white"> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg> </button> </div> </div> </header> <div className="px-2 my-4"> <button onClick={onCreateSession} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg shadow-lg text-lg transition-transform active:scale-95">+ 새로운 술자리</button> </div> <main className="space-y-3"> {sessions.length === 0 ? ( <div className="text-center text-gray-500 mt-16"> <p className="text-lg">아직 기록이 없네요.</p> <p>상단의 버튼을 눌러 첫 술자리를 기록해보세요!</p> </div> ) : ( sessions.map(session => ( <SessionListItem key={session.id} session={session} userProfile={userProfile} onSelectSession={onSelectSession} onDeleteClick={onDeleteClick} /> )) )} </main> </div> );};
+const StatsPage = ({ sessions, userProfile }) => { const [currentDate, setCurrentDate] = useState(new Date()); const drinkingDays = new Set( sessions.map(s => s.createdAt.toDate().toDateString()) ); const tileContent = ({ date, view }) => { if (view === 'month' && drinkingDays.has(date.toDateString())) { return <div className="drinking-day-dot"></div>; } }; const monthlySessions = sessions.filter(s => { const sessionDate = s.createdAt.toDate(); return sessionDate.getFullYear() === currentDate.getFullYear() && sessionDate.getMonth() === currentDate.getMonth(); }); const totalDrinkingDays = monthlySessions.length; const totalAlcoholGrams = monthlySessions.reduce((total, session) => { const sessionGrams = Object.keys(session.counts).reduce((acc, key) => ( acc + (session.counts[key] * DRINKS_INFO[key].volume * DRINKS_INFO[key].abv * ALCOHOL_DENSITY) ), 0); return total + sessionGrams; }, 0); return ( <div className="w-full max-w-md mx-auto pt-2 px-2 sm:px-4 pb-20"><header className="text-center py-3"><h1 className="text-3xl sm:text-4xl font-bold text-emerald-400">음주 기록 통계</h1></header><main className="space-y-4 mt-4"><Calendar onChange={setCurrentDate} value={currentDate} tileContent={tileContent} formatDay={(locale, date) => date.getDate()} /><div className="bg-gray-800 p-4 rounded-lg"><h2 className="text-xl font-bold mb-3">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월 요약</h2><div className="space-y-2 text-lg"><div className="flex justify-between"><span>총 음주 횟수:</span> <strong>{totalDrinkingDays}회</strong></div><div className="flex justify-between"><span>총 섭취 알코올:</span> <strong>{totalAlcoholGrams.toFixed(1)}g</strong></div>{userProfile && <div className="flex justify-between"><span>소주 환산:</span> <strong>{(totalAlcoholGrams / SOJU_BOTTLE_ALCOHOL_GRAMS).toFixed(1)}병</strong></div>}</div></div></main></div> );};
+const BottomNav = ({ currentView, setView }) => { return ( <div className="fixed bottom-0 left-0 right-0 w-full max-w-md mx-auto bg-gray-800 border-t border-gray-700"><div className="flex justify-around"><button onClick={() => setView('list')} className={`flex-1 py-3 text-center ${currentView === 'list' ? 'text-emerald-400' : 'text-gray-400'}`}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>기록</button><button onClick={() => setView('stats')} className={`flex-1 py-3 text-center ${currentView === 'stats' ? 'text-emerald-400' : 'text-gray-400'}`}><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-1"><path d="M12 20v-6M12 14V4M6 20v-2M6 18V4M18 20v-4M18 16V4"/></svg>통계</button></div></div> );};
+
+
 export default function App() {
-    // *** 변경점: userId 대신 user 객체 전체를 저장하여 로그인 상태를 더 명확하게 관리합니다. ***
     const [user, setUser] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [userProfile, setUserProfile] = useState(null);
     const [sessions, setSessions] = useState([]);
-    const [view, setView] = useState('list');
+    const [view, setView] = useState('list'); 
     const [currentSessionId, setCurrentSessionId] = useState(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showNewSessionModal, setShowNewSessionModal] = useState(false);
     const [deleteModalInfo, setDeleteModalInfo] = useState({ isOpen: false, sessionId: null });
     const [editNameModalInfo, setEditNameModalInfo] = useState({ isOpen: false, sessionId: null, currentName: '' });
 
-    // *** 변경점: onAuthStateChanged를 사용하여 로그인, 로그아웃 상태 변화를 감지합니다. ***
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
-            setUser(user); // 사용자가 있으면 user 객체를, 없으면 null을 저장
-            setIsAuthReady(true); // 인증 상태 확인 완료
+            setUser(user); 
+            setIsAuthReady(true); 
         });
         return () => unsubscribe();
     }, []);
 
-    // *** 변경점: user.uid가 있을 때만 Firestore 데이터를 가져옵니다. ***
     useEffect(() => {
-        if (!user) { // 사용자가 없으면(로그아웃 상태) 데이터 초기화
+        if (!user) { 
             setUserProfile(null);
             setSessions([]);
             return;
@@ -231,7 +275,6 @@ export default function App() {
                 setUserProfile(docSnap.data());
                 setShowProfileModal(false);
             } else {
-                // 새 사용자는 프로필이 없으므로, 프로필 입력 모달을 띄웁니다.
                 setShowProfileModal(true);
             }
         });
@@ -245,7 +288,7 @@ export default function App() {
         });
 
         return () => { unsubProfile(); unsubSessions(); };
-    }, [user]); // user 객체가 바뀔 때마다 이 useEffect를 다시 실행
+    }, [user]); 
 
     const handleSaveProfile = async (profileData) => {
         if (!user) return;
@@ -255,13 +298,16 @@ export default function App() {
         setShowProfileModal(false);
     };
 
-    const handleCreateSession = async (eventName) => {
+    // *** 변경점: handleCreateSession이 날짜만 받도록 수정 ***
+    const handleCreateSession = async (eventName, eventDate) => {
         if (!user) return;
         const newSession = {
             eventName,
-            createdAt: new Date(),
+            createdAt: eventDate,
+            startTime: null, // 시작 시간은 null로 초기화
+            endTime: null,   // 종료 시간은 null로 초기화
             counts: Object.keys(DRINKS_INFO).reduce((acc, key) => ({ ...acc, [key]: 0 }), {}),
-            startTime: null, endTime: null, peakPercentage: null,
+            peakPercentage: null,
         };
         const sessionRef = await addDoc(collection(db, `artifacts/${appId}/users/${user.uid}/drinking_sessions`), newSession);
         setCurrentSessionId(sessionRef.id);
@@ -299,27 +345,54 @@ export default function App() {
         setEditNameModalInfo({ isOpen: false, sessionId: null, currentName: '' });
     };
 
-    // *** 새로운 함수: 로그아웃 처리 ***
     const handleLogout = async () => {
         try {
             await signOut(auth);
-            // 로그아웃 성공 시 onAuthStateChanged가 감지하여 user 상태를 null로 바꿈
         } catch (error) {
             console.error("Logout error", error);
         }
     };
 
-    // 인증 상태를 확인하는 동안 로딩 화면을 보여줍니다.
     if (!isAuthReady) return <Loader />;
+
+    const renderMainContent = () => {
+        switch (view) {
+            case 'list':
+                return (
+                    <SessionList 
+                        sessions={sessions} 
+                        userProfile={userProfile}
+                        onSelectSession={(id) => { setCurrentSessionId(id); setView('detail'); }} 
+                        onCreateSession={() => setShowNewSessionModal(true)}
+                        onProfileClick={() => setShowProfileModal(true)}
+                        onDeleteClick={handleDeleteClick}
+                        onLogout={handleLogout} 
+                    />
+                );
+            case 'stats':
+                return (
+                    <StatsPage sessions={sessions} userProfile={userProfile} />
+                );
+            case 'detail':
+                return (
+                    currentSessionId && <SessionDetail 
+                        userId={user.uid} 
+                        userProfile={userProfile} 
+                        sessionId={currentSessionId} 
+                        goBack={() => setView('list')} 
+                        onEditClick={handleEditNameClick}
+                    />
+                );
+            default:
+                return <SessionList sessions={sessions} userProfile={userProfile} onSelectSession={(id) => { setCurrentSessionId(id); setView('detail'); }} onCreateSession={() => setShowNewSessionModal(true)} onProfileClick={() => setShowProfileModal(true)} onDeleteClick={handleDeleteClick} onLogout={handleLogout} />;
+        }
+    };
 
     return (
         <div className="bg-black text-white min-h-screen font-sans">
-            {/* *** 변경점: 로그인 상태에 따라 다른 화면을 보여줍니다. *** */}
             {!user ? (
-                // 로그아웃 상태: 로그인/회원가입 화면 표시
                 <AuthScreen />
             ) : (
-                // 로그인 상태: 기존 앱 화면 표시
                 <>
                     {showProfileModal && <ProfileModal userProfile={userProfile} onSave={handleSaveProfile} onClose={() => { if(userProfile) setShowProfileModal(false) }} />}
                     {showNewSessionModal && <NewSessionModal onSave={handleCreateSession} onClose={() => setShowNewSessionModal(false)} />}
@@ -339,25 +412,8 @@ export default function App() {
                         />
                     )}
                     
-                    {view === 'list' ? (
-                        <SessionList 
-                            sessions={sessions} 
-                            userProfile={userProfile}
-                            onSelectSession={(id) => { setCurrentSessionId(id); setView('detail'); }} 
-                            onCreateSession={() => setShowNewSessionModal(true)}
-                            onProfileClick={() => setShowProfileModal(true)}
-                            onDeleteClick={handleDeleteClick}
-                            onLogout={handleLogout} // 로그아웃 함수 전달
-                        />
-                    ) : (
-                        currentSessionId && <SessionDetail 
-                            userId={user.uid} // user.uid를 직접 전달
-                            userProfile={userProfile} 
-                            sessionId={currentSessionId} 
-                            goBack={() => setView('list')} 
-                            onEditClick={handleEditNameClick}
-                        />
-                    )}
+                    {renderMainContent()}
+                    {view !== 'detail' && <BottomNav currentView={view} setView={setView} />}
                 </>
             )}
         </div>
