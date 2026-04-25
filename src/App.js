@@ -168,6 +168,27 @@ const StatsPage = ({ sessions, userProfile }) => {
         return total + sessionGrams;
     }, 0);
     const averageAlcoholGrams = totalDrinkingDays > 0 ? (totalAlcoholGrams / totalDrinkingDays) : 0;
+
+    // 전체 기간 기반 패턴 분석
+    const allSessionsWithDrinks = sessions.filter(s =>
+        Object.values(s.counts).some(c => c > 0)
+    );
+    const allTotalGrams = allSessionsWithDrinks.reduce((total, s) => {
+        return total + Object.keys(s.counts).reduce((acc, key) =>
+            acc + ((s.counts[key] || 0) * DRINKS_INFO[key].volume * DRINKS_INFO[key].abv * ALCOHOL_DENSITY), 0);
+    }, 0);
+    const avgBottlesAll = allSessionsWithDrinks.length > 0
+        ? allTotalGrams / allSessionsWithDrinks.length / SOJU_BOTTLE_ALCOHOL_GRAMS
+        : 0;
+    const inputCapacity = userProfile?.capacity || 0;
+    const capacityRatio = inputCapacity > 0 ? (avgBottlesAll / inputCapacity) * 100 : 0;
+    const getCapacityInsight = () => {
+        if (allSessionsWithDrinks.length < 3) return { msg: '데이터가 더 쌓이면 분석이 가능해요 (최소 3회)', color: 'text-gray-400' };
+        if (capacityRatio > 120) return { msg: '실제로는 입력 주량보다 많이 드시는 편이에요', color: 'text-orange-400' };
+        if (capacityRatio > 80) return { msg: '실제 음주량이 입력 주량과 비슷합니다', color: 'text-emerald-400' };
+        return { msg: '실제로는 입력 주량보다 여유있게 드시는 편이에요', color: 'text-blue-400' };
+    };
+    const capacityInsight = getCapacityInsight();
     
     return (
         <div className="w-full max-w-md mx-auto pt-2 px-2 sm:px-4 pb-20">
@@ -196,6 +217,22 @@ const StatsPage = ({ sessions, userProfile }) => {
                         <div className="flex justify-between py-1"><span className="text-gray-400">음주 횟수:</span> <strong className="text-white">{totalDrinkingDays}회</strong></div>
                         <div className="flex justify-between py-1"><span className="text-gray-400">총 섭취량:</span> <strong className="text-white">{totalAlcoholGrams.toFixed(1)}g</strong></div>
                         <div className="flex justify-between py-1"><span className="text-gray-400">평균 섭취량:</span> <strong className="text-white">{averageAlcoholGrams.toFixed(1)}g</strong></div>
+                    </div>
+                </div>
+                <div className="bg-gray-800 p-4 rounded-lg">
+                    <h2 className="text-sm font-bold text-gray-400 mb-3">📊 나의 음주 패턴 분석 <span className="text-xs font-normal">(전체 기간 · {allSessionsWithDrinks.length}회 기준)</span></h2>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex justify-between"><span className="text-gray-400">평균 음주량</span><strong className="text-white">{avgBottlesAll.toFixed(1)}병/회 (소주 환산)</strong></div>
+                        <div className="border-t border-gray-700 pt-2 mt-2">
+                            <div className="flex justify-between py-1"><span className="text-gray-400">입력 주량</span><span className="text-white">{inputCapacity}병</span></div>
+                            <div className="flex justify-between py-1"><span className="text-gray-400">데이터 기반 실질 주량</span><span className="text-emerald-400 font-bold">{avgBottlesAll.toFixed(1)}병</span></div>
+                            {allSessionsWithDrinks.length >= 3 && (
+                                <div className="w-full bg-gray-700 rounded-full h-3 mt-2">
+                                    <div className="h-3 rounded-full bg-emerald-500 transition-all duration-300" style={{ width: `${Math.min(100, capacityRatio)}%` }}></div>
+                                </div>
+                            )}
+                            <p className={`text-center text-xs font-semibold mt-2 ${capacityInsight.color}`}>{capacityInsight.msg}</p>
+                        </div>
                     </div>
                 </div>
                 <div className="flex justify-end mb-2"><button onClick={() => setCurrentDate(new Date())} className="text-xs bg-gray-700 hover:bg-gray-600 text-emerald-400 px-3 py-1 rounded-full transition">오늘로 이동</button></div>
