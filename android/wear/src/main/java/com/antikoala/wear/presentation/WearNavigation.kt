@@ -70,7 +70,8 @@ fun WearNavigation(viewModel: WearViewModel) {
                     onIncrement = viewModel::increment,
                     onDecrement = viewModel::decrement,
                     onStart = viewModel::startSession,
-                    onEnd = viewModel::endSession
+                    onEnd = viewModel::endSession,
+                    onBack = { navController.popBackStack() }
                 )
             }
         }

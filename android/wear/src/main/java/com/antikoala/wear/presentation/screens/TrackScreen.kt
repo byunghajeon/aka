@@ -32,7 +32,8 @@ fun TrackScreen(
     onIncrement: (String) -> Unit,
     onDecrement: (String) -> Unit,
     onStart: () -> Unit,
-    onEnd: () -> Unit
+    onEnd: () -> Unit,
+    onBack: () -> Unit
 ) {
     val pagerState = rememberPagerState(pageCount = { DRINKS_LIST.size })
     val scope = rememberCoroutineScope()
@@ -180,6 +181,13 @@ fun TrackScreen(
                     )
                     else -> Text("완료됨", fontSize = 11.sp, color = Color(0xFF6B7280))
                 }
+
+                Spacer(Modifier.height(4.dp))
+                CompactChip(
+                    label = { Text("← 목록", fontSize = 11.sp) },
+                    onClick = onBack,
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF1F2937))
+                )
             }
         }
     }
