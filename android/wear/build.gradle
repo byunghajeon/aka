@@ -7,6 +7,12 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader -> localProperties.load(reader) }
+}
+
 android {
     namespace 'com.antikoala.wear'
     compileSdk rootProject.ext.compileSdkVersion
@@ -17,6 +23,11 @@ android {
         targetSdk rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        buildConfigField "String", "FIREBASE_API_KEY",      "\"${localProperties['firebase.wear.apiKey'] ?: ''}\""
+        buildConfigField "String", "FIREBASE_APP_ID",       "\"${localProperties['firebase.wear.appId'] ?: ''}\""
+        buildConfigField "String", "FIREBASE_PROJECT_ID",   "\"${localProperties['firebase.wear.projectId'] ?: ''}\""
+        buildConfigField "String", "FIREBASE_STORAGE_BUCKET","\"${localProperties['firebase.wear.storageBucket'] ?: ''}\""
+        buildConfigField "String", "FIREBASE_SENDER_ID",    "\"${localProperties['firebase.wear.senderId'] ?: ''}\""
     }
 
     signingConfigs {
@@ -47,6 +58,7 @@ android {
     }
     buildFeatures {
         compose true
+        buildConfig true
     }
     composeOptions {
         kotlinCompilerExtensionVersion '1.5.8'
