@@ -93,6 +93,83 @@ versionName "1.2"   // 사용자에게 표시되는 버전
 
 ---
 
+## Wear OS 앱 (Galaxy Watch 연동)
+
+### 구조 개요
+
+- `android/wear/` — Kotlin + Jetpack Compose for Wear OS 모듈
+- 폰 앱 AAB에 워치 앱이 번들로 포함됨 (`wearApp project(':wear')`)
+- Play Store에서 폰 앱 설치 시 페어링된 갤럭시 워치에 **자동 설치**
+- 같은 Firebase 프로젝트 사용 → **동일 계정 로그인 시 데이터 실시간 공유**
+
+### 기능
+
+| 화면 | 내용 |
+|------|------|
+| 로그인 | 이메일/비밀번호 (워치에서 최초 1회, 이후 자동 로그인) |
+| 술자리 목록 | 폰 앱에서 생성한 술자리 실시간 조회, 진행중 표시 |
+| 기록 화면 | 왕관 다이얼로 주류 전환, +/- 버튼, 시작/종료, 주량대비% + 페이스 표시 |
+
+> 술자리 **생성**은 폰 앱에서만 가능. 워치는 선택 및 기록만 담당.
+
+### Firebase 설정 (local.properties)
+
+워치 앱은 Firebase를 수동 초기화하며, 키는 `android/local.properties`에서 관리 (git 제외):
+
+```properties
+firebase.wear.apiKey=<Firebase API 키>
+firebase.wear.appId=<Android 앱 ID>
+firebase.wear.projectId=anti-koala
+firebase.wear.storageBucket=anti-koala.firebasestorage.app
+firebase.wear.senderId=<Sender ID>
+```
+
+값은 Firebase Console → 프로젝트 설정 → `google-services.json`에서 확인.
+
+---
+
+## Galaxy Watch 개발/테스트 (ADB 무선 연결)
+
+### 환경 조건
+
+- PC와 워치가 **반드시 같은 WiFi** 에 연결되어야 함
+- 갤럭시 폰과 블루투스 연결 상태에서는 워치 IP가 폰 내부 네트워크(192.0.0.x)로 표시되어 연결 불가
+- 아이폰 핫스팟 환경에서는 PC(172.20.10.x)와 워치 서브넷이 달라 연결 불가
+- **권장**: 공용 WiFi 또는 동일 공유기에 PC·워치 모두 연결
+
+### ADB 연결 순서 (Android 11+ 페어링 방식)
+
+```powershell
+# 1. 워치: 개발자 옵션 → 무선 디버깅 ON
+#          → 새 기기 등록 → 와이파이 페어링 코드 (IP:포트 + 6자리 코드 확인)
+
+# 2. 페어링 (최초 1회)
+echo "<6자리코드>" | adb pair <IP>:<페어링포트>
+
+# 3. 연결
+adb connect <IP>:<디버깅포트>
+
+# 4. APK 설치
+adb -s <IP>:<포트> install -r android/wear/build/outputs/apk/debug/wear-debug.apk
+```
+
+### debug APK 빌드
+
+```powershell
+cd android
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+.\gradlew.bat :wear:assembleDebug
+# 결과물: android/wear/build/outputs/apk/debug/wear-debug.apk
+```
+
+### 주의사항
+
+- 공용 WiFi 중 **클라이언트 격리** 설정된 곳(일부 카페 등)은 ADB 연결 차단됨
+- ADB 연결은 WiFi 절전 시 끊길 수 있음 → `adb connect <IP>:<포트>` 재실행으로 복구
+- Galaxy Watch 4는 `adb pair` 페어링 코드 UI가 "새 기기 등록" 하위 메뉴에 있음
+
+---
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
