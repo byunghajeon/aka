@@ -68,8 +68,19 @@ class WearViewModel : ViewModel() {
                         )
                     }
                 }
-                .onFailure {
-                    _authState.update { it.copy(isLoading = false, error = "로그인 실패") }
+                .onFailure { e ->
+                    val message = when ((e as? com.google.firebase.FirebaseException)?.let {
+                        (it as? com.google.firebase.auth.FirebaseAuthException)?.errorCode
+                    }) {
+                        "ERROR_INVALID_CREDENTIAL",
+                        "ERROR_WRONG_PASSWORD",
+                        "ERROR_USER_NOT_FOUND"  -> "이메일 또는 비밀번호가 올바르지 않습니다"
+                        "ERROR_INVALID_EMAIL"   -> "이메일 형식이 올바르지 않습니다"
+                        "ERROR_TOO_MANY_REQUESTS" -> "시도 횟수 초과. 잠시 후 다시 시도해주세요"
+                        "ERROR_NETWORK_REQUEST_FAILED" -> "네트워크 연결을 확인해주세요"
+                        else -> "로그인에 실패했습니다. 다시 시도해주세요"
+                    }
+                    _authState.update { it.copy(isLoading = false, error = message) }
                 }
         }
     }
